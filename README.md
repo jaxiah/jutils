@@ -50,8 +50,8 @@
 示例：
 
 ```markdown
-- [[new ankify pass - ddca.solid]] : 5
-- [[CS149 Kayvon part - 剩下的课程以及之前的 ankify]] : 4
+- [[Task A]] : 5
+- [[Task B]] : 4
 ```
 
 双链中的文件名须与 TaskNotes 中的任务文件名一致（不含路径和 `.md` 后缀）。匹配采用路径后缀匹配，因此任务可以放在 vault 的任意子目录下。
@@ -72,8 +72,8 @@ pythonw monitor.py
 
 ```
 [TaskMonitor] 2026-03-19  ─────────────────────────────
-  [OK   ]  2/5  ██░░░  new ankify pass - ddca.solid
-  [OK   ]  1/4  █░░░   CS149 Kayvon part - 剩下的课程以及之前的 ankify
+  [OK   ]  2/5  ██░░░  Task A
+  [OK   ]  1/4  █░░░   Task B
 ```
 
 ## 弹窗行为

@@ -38,7 +38,21 @@ pythonw tasknotes_quota_monitor.py   # 后台运行（无命令行窗口）
 
 ```bash
 python md_punct_cn2en.py file.md          # 输出到 stdout
+python md_punct_cn2en.py -o out.md file.md  # 输出到指定文件
 python md_punct_cn2en.py -i file.md       # 原地修改
 python md_punct_cn2en.py -i docs/         # 递归处理目录
 python md_punct_cn2en.py -i "**/*.md"     # glob 模式
 ```
+
+---
+
+## clang_format_dir.py
+
+递归扫描目录下所有 C/C++/CUDA/GLSL/HLSL 源文件并用 `clang-format` 原地格式化. 要求目录内存在 `.clang-format`, 否则跳过. 多线程并行, 大型代码库也快.
+
+```bash
+python clang_format_dir.py src/                  # 格式化 src/ 下所有文件
+python clang_format_dir.py src/ include/ -j 16   # 多目录, 16 线程
+```
+
+依赖: `clang-format` (需在 PATH 中), `tqdm` (`pip install tqdm`).

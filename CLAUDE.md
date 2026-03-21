@@ -4,10 +4,11 @@
 
 ## 脚本列表
 
-| 脚本 | 类型 | 说明 |
-|------|------|------|
+| 脚本                         | 类型     | 说明                                            |
+| ---------------------------- | -------- | ----------------------------------------------- |
 | `tasknotes_quota_monitor.py` | 守护进程 | Obsidian TaskNotes 番茄钟配额监控, 超额强制弹窗 |
-| `md_punct_cn2en.py` | CLI 工具 | Markdown 中文标点转英文标点 |
+| `md_punct_cn2en.py`          | CLI 工具 | Markdown 中文标点转英文标点                     |
+| `clang_format_dir.py`        | CLI 工具 | 批量 clang-format 格式化 C/C++/CUDA/GLSL 源码树 |
 
 ## 代码规范
 

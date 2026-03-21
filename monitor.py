@@ -177,6 +177,7 @@ def run() -> None:
 
     current_date = date.today()
     last_alerted: dict = {}  # {task_name: done_count_at_last_alert}
+    last_quotas: dict = {}  # {task_name: quota}，用于检测配额变化
     mtime_daily = None
     mtime_json = None
 
@@ -207,12 +208,20 @@ def run() -> None:
                 new_mtime_json = None
 
             # 只要有文件变化才重新解析
-            if new_mtime_daily != mtime_daily or new_mtime_json != mtime_json:
+            daily_changed = new_mtime_daily != mtime_daily
+            if daily_changed or new_mtime_json != mtime_json:
                 mtime_daily = new_mtime_daily
                 mtime_json = new_mtime_json
 
                 quotas = parse_quotas(cfg, current_date)
                 pomo = count_pomodoros(cfg, current_date)
+
+                # 日记变化时，配额有变动的任务清除警告记录，让其重新评估
+                if daily_changed:
+                    for task_name, quota in quotas.items():
+                        if last_quotas.get(task_name) != quota:
+                            last_alerted.pop(task_name, None)
+                last_quotas = quotas
 
                 alerts = []
                 pending = []

@@ -1,3 +1,6 @@
+# Per-script config (personal paths, never commit)
+*.config.json
+
 # Python
 __pycache__/
 *.py[cod]

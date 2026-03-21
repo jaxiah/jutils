@@ -1,7 +1,31 @@
 #!/usr/bin/env python3
 """
-Obsidian Task Monitor
-番茄钟配额守护进程 — 自动检测超额并强制弹窗打断
+tasknotes_quota_monitor.py — Obsidian TaskNotes 番茄钟配额守护进程
+
+每 N 秒轮询日记文件与 TaskNotes data.json 的 mtime，当某任务完成的番茄钟
+数量达到或超出当日配额时，弹出 tkinter 置顶窗口强制打断，并展示尚有盈余
+的任务引导切换。弹窗需手动关闭，确保打断效果。
+
+设计要点
+--------
+- 输入 A：DailyNotes/YYYY-MM-DD.md，提取 `- [[任务名]] : N` 格式的配额声明。
+- 输入 B：TaskNotes/data.json，统计今日 type=work、completed=true 的条目。
+- 匹配：用路径后缀匹配（endswith("{task}.md")），消除路径前缀差异造成的误判。
+- 防骚扰：内存字典记录每个任务上次警告时的完成数，只有完成数继续增加才再次触发。
+- 跨夜：零点后自动切换至次日日记路径，清空警告历史。
+- 容错：文件不存在或 JSON 读写冲突时静默跳过，等待下一个轮询周期。
+- 配额变更：日记保存后若配额变动，受影响任务立即用新配额重新评估。
+
+Config
+------
+首次运行时自动生成 tasknotes_quota_monitor.config.json，填入路径后重新运行。
+
+Changelog
+---------
+2026-03-21  per-script config 自动生成；从 monitor.py 重命名
+2026-03-21  日记配额变更时清除对应任务的警告历史，立即重新评估
+2026-03-21  区分"额度已用完"（done==quota）与"严重超时"（done>quota）
+2026-03-21  initial implementation
 """
 
 import json
@@ -14,19 +38,29 @@ from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8")  # type: ignore
 
+# ---------------------------------------------------------------------------
+# Config
+# ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# 配置
-# ---------------------------------------------------------------------------
+DEFAULT_CONFIG = {
+    "daily_notes_path": "填入你的 Obsidian 日记目录路径，例如 D:/JNote/daily",
+    "data_json_path": "填入 TaskNotes data.json 的完整路径，例如 D:/JNote/.obsidian/plugins/tasknotes/data.json",
+    "poll_interval": 3,
+}
+
+
 def load_config() -> dict:
-    config_path = Path(__file__).parent / "config.json"
-    with open(config_path, encoding="utf-8") as f:
-        return json.load(f)
+    path = Path(__file__).with_suffix(".config.json")
+    if not path.exists():
+        path.write_text(json.dumps(DEFAULT_CONFIG, ensure_ascii=False, indent=2), encoding="utf-8")
+        sys.exit(f"已生成配置文件 {path.name}，请填入路径后重新运行。")
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 # ---------------------------------------------------------------------------
 # 数据解析
 # ---------------------------------------------------------------------------
+
 QUOTA_RE = re.compile(r"^[-*]\s+\[\[(.*?)\]\]\s*:\s*(\d+)", re.MULTILINE)
 
 
@@ -70,6 +104,8 @@ def task_done_count(task_name: str, pomo_counts: dict) -> int:
 # ---------------------------------------------------------------------------
 # 弹窗
 # ---------------------------------------------------------------------------
+
+
 def show_alert(overloaded: list, pending: list) -> None:
     """
     overloaded: [(task_name, done, quota), ...]
@@ -171,6 +207,8 @@ def show_alert(overloaded: list, pending: list) -> None:
 # ---------------------------------------------------------------------------
 # 主循环
 # ---------------------------------------------------------------------------
+
+
 def run() -> None:
     cfg = load_config()
     interval = cfg.get("poll_interval", 3)

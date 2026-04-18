@@ -118,7 +118,7 @@ def _convert_text(text: str) -> str:
     #    Exception: `[ ]` / `[x]` are Markdown task-list checkboxes — leave them alone.
     text = re.sub(r"\( +", "(", text)
     text = re.sub(r" +\)", ")", text)
-    text = re.sub(r"\[ +(?!\])", "[", text)   # don't eat the space in `[ ]`
+    text = re.sub(r"\[ +(?!\])", "[", text)  # don't eat the space in `[ ]`
     text = re.sub(r"(?<!\[) +\]", "]", text)  # don't eat the space in `[ ]`
     # c) Collapse multiple consecutive spaces (but not leading indentation)
     text = re.sub(r"(?<=\S) {2,}", " ", text)

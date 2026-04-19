@@ -1,18 +1,17 @@
 """
-tests/test_tasknotes_save_state.py
+tests/test_pomo_debrief.py
 
-Tests for tasknotes_save_state.py helper functions and detection logic.
-Uses tests/fixtures/tasknotes_data.json (copy of real data.json).
+Tests for pomo_debrief.py helper functions and detection logic.
+Uses tests/fixtures/tasknotes_data.json (synthetic data).
 """
 
-import json
 import sys
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from tasknotes_save_state import (
+from pomo_debrief import (
     count_today_pomos_for_task,
     fmt_time,
     is_completed_work,

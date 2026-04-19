@@ -2,35 +2,42 @@
 
 存放一些功能实用且一个文件就能讲清楚的脚本.
 
-- [tasknotes_quota_monitor.py](#tasknotes_quota_monitorpy)
+- [pomo_debrief.py](#pomo_debriefpy)
 - [md_punct_cn2en.py](#md_punct_cn2enpy)
 - [clang_format_dir.py](#clang_format_dirpy)
 
-## tasknotes_quota_monitor.py
+## pomo_debrief.py
 
-Obsidian TaskNotes 番茄钟配额守护进程. 在日记里声明每个任务今天最多投入几个番茄钟, 一旦某任务用满配额, 立刻弹出置顶窗口打断你, 并列出尚有盈余的任务引导切换.
+Obsidian TaskNotes 番茄钟复盘提示器. 每当 TaskNotes 完成一个 work 番茄钟, 自动弹出置顶窗口, 引导记录本次进展 (save state), 并将内容追加到对应 TaskNote 文件的当日日期分组下.
 
-![弹窗示例](./assets/image.jpg)
+弹窗显示任务名、今日第几个番茄钟、开始/结束时间, 输入框支持单行和多行记录. 单行直接跟在时间戳后, 多行自动缩进为合法的 Markdown bullet 续行. 跳过时静默关闭, 不写入任何内容.
 
-弹窗分两个区域:
-
-- **红色 Stop 区**: 显示超额任务, 打断当前行为
-- **绿色 Go 区**: 列出待办任务及剩余配额, 引导下一步行动
-
-**日记格式** (在当日笔记任意位置声明配额):
+写入格式示例:
 
 ```markdown
-- [[Task A]] : 5
-- [[Task B]] : 4
+### 2026-04-19
+
+- [2026-04-19 Sat 10:25] -- [2026-04-19 Sat 10:50] 确认 wmma tiling 逻辑正确, bank conflict 问题已排除
+- [2026-04-19 Sat 11:00] -- [2026-04-19 Sat 11:25]
+  尝试 double buffering 方案
+  卡在 async memcpy 的 barrier 位置, 下一步查文档
 ```
 
-**运行**: 首次运行自动生成 `tasknotes_quota_monitor.config.json`, 填入路径后重新运行.
+**运行**: 首次运行自动生成 `pomo_debrief.config.json`, 填入路径后重新运行.
 
 ```bash
-pythonw tasknotes_quota_monitor.py   # 后台运行（无命令行窗口）
+pythonw pomo_debrief.py   # 后台运行（无命令行窗口）
 ```
 
-依赖: Python 3.8+, 标准库 (`tkinter`, `json`, `re`), 无需额外安装.
+**Config 字段**:
+
+| 字段 | 说明 |
+| --- | --- |
+| `vault_path` | Obsidian vault 根目录路径 |
+| `data_json_path` | TaskNotes 插件的 data.json 完整路径 |
+| `poll_interval` | 轮询间隔秒数 (默认 3) |
+
+依赖: Python 3.8+, 标准库 (`tkinter`, `json`), 无需额外安装.
 
 ## md_punct_cn2en.py
 

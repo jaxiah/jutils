@@ -33,7 +33,6 @@ pythonw pomo_debrief.py   # 后台运行（无命令行窗口）
 
 | 字段 | 说明 |
 | --- | --- |
-| `vault_path` | Obsidian vault 根目录路径 |
 | `data_json_path` | TaskNotes 插件的 data.json 完整路径 |
 | `poll_interval` | 轮询间隔秒数 (默认 3) |
 

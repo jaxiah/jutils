@@ -86,7 +86,7 @@ class TestTaskDisplayName(unittest.TestCase):
 
 class TestLoadPomoHistory(unittest.TestCase):
     def setUp(self):
-        self.cfg = {"data_json_path": str(FIXTURE)}
+        self.cfg = {"data_json_path": str(FIXTURE), "poll_interval": 3}
 
     def test_returns_list(self):
         history = load_pomo_history(self.cfg)
@@ -116,7 +116,7 @@ class TestLoadPomoHistory(unittest.TestCase):
 
 class TestCountTodayPomos(unittest.TestCase):
     def setUp(self):
-        self.cfg = {"data_json_path": str(FIXTURE)}
+        self.cfg = {"data_json_path": str(FIXTURE), "poll_interval": 3}
         self.history = load_pomo_history(self.cfg)
 
     def test_nonexistent_task_returns_zero(self):

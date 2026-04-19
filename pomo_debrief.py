@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """
-tasknotes_save_state.py -- Obsidian TaskNotes 番茄钟 Save State 提示器
+pomo_debrief.py -- Obsidian TaskNotes 番茄钟复盘提示器
 
 每当 TaskNotes 完成一个 work 番茄钟，弹出提示窗口，引导用户记录本次进展
-(save state)，并自动追加到对应的 TaskNote 文件末尾。
+(save state)，并将内容追加到对应 TaskNote 文件的当日日期分组下。
 
 Config
 ------
-首次运行时自动生成 tasknotes_save_state.config.json，填入路径后重新运行。
+首次运行时自动生成 pomo_debrief.config.json，填入路径后重新运行。
 
 Changelog
 ---------
+2026-04-19  rename to pomo_debrief; derive vault_path from data_json_path
 2026-04-18  initial implementation
 """
 
@@ -28,10 +29,14 @@ sys.stdout.reconfigure(encoding="utf-8")  # type: ignore
 # ---------------------------------------------------------------------------
 
 DEFAULT_CONFIG = {
-    "vault_path": "填入你的 Obsidian vault 根目录路径，例如 D:/JNote",
     "data_json_path": "填入 TaskNotes data.json 的完整路径，例如 D:/JNote/.obsidian/plugins/tasknotes/data.json",
     "poll_interval": 3,
 }
+
+
+def vault_path_from_config(cfg: dict) -> Path:
+    """从 data_json_path 推导 vault 根目录 (<vault>/.obsidian/plugins/tasknotes/data.json)."""
+    return Path(cfg["data_json_path"]).parents[3]
 
 
 def load_config() -> dict:
@@ -88,7 +93,7 @@ def fmt_time(iso: str) -> str:
 
 
 def append_save_state(cfg: dict, task_path: str, text: str, start_time: str, end_time: str) -> None:
-    full_path = Path(cfg["vault_path"]) / task_path
+    full_path = vault_path_from_config(cfg) / task_path
     if not full_path.exists():
         print(f"[SaveState] 文件不存在: {full_path}")
         return

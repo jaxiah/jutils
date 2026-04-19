@@ -101,12 +101,18 @@ def append_save_state(cfg: dict, task_path: str, text: str, start_time: str, end
     stripped = text.strip()
     lines = stripped.splitlines()
     if len(lines) <= 1:
-        line = f"\n- {time_range} {stripped}\n"
+        bullet = f"- {time_range} {stripped}"
     else:
         indented = "\n".join(f"  {l}" for l in lines)
-        line = f"\n- {time_range}\n{indented}\n"
+        bullet = f"- {time_range}\n{indented}"
+    today_heading = f"### {date.today().strftime('%Y-%m-%d')}"
+    existing = full_path.read_text(encoding="utf-8")
+    if today_heading in existing:
+        entry = f"\n{bullet}\n"
+    else:
+        entry = f"\n{today_heading}\n\n{bullet}\n"
     with open(full_path, "a", encoding="utf-8") as f:
-        f.write(line)
+        f.write(entry)
     print(f"[SaveState] 已写入: {full_path.name}")
 
 

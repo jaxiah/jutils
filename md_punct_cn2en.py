@@ -62,7 +62,8 @@ PUNCT_MAP = [
     ("\u2019", "' "),  # '
     # Ellipsis
     ("…", "... "),
-    # Em dash
+    # Em dash — double (——) must come before single (—) to match as a unit
+    ("——", " -- "),
     ("—", " — "),
     # Full-width hyphen
     ("－", " - "),

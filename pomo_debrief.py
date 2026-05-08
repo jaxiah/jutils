@@ -64,7 +64,6 @@ def is_completed_work(entry: dict) -> bool:
     return entry.get("type") == "work" and entry.get("completed") is True
 
 
-
 def count_today_pomos_for_task(history: list, task_path: str) -> int:
     today = date.today().strftime("%Y-%m-%d")
     return sum(1 for e in history if is_completed_work(e) and e.get("taskPath") == task_path and e.get("startTime", "").startswith(today))

@@ -70,14 +70,14 @@ check("collapse multiple spaces", _convert_text("你好，  世界"), "你好, �
 print("\n=== Bold/italic closing markers ===")
 # ---------------------------------------------------------------------------
 
-check("colon before closing **",   convert_markdown("**对 Device：** 说明"),     "**对 Device:** 说明")
-check("comma before closing **",   convert_markdown("**加粗，** 更多"),           "**加粗,** 更多")
-check("colon before closing *",    convert_markdown("*斜体：* 说明"),             "*斜体:* 说明")
-check("opening ** unaffected",              convert_markdown("这是 **重要** 内容"),                "这是 **重要** 内容")
-check("english ( after ** unaffected",      convert_markdown("这是 **(重要)** 内容"),               "这是 **(重要)** 内容")
-check("fullwidth ( after ** fixed",          convert_markdown("这是 **（重要）** 内容"),              "这是 **(重要)** 内容")
-check("bold not broken by colon",           convert_markdown("**对 Device (设备端)：** CPU 执行"),   "**对 Device (设备端):** CPU 执行")
-check("bold not broken by closing bracket", convert_markdown("**对 Device (设备端)）** CPU 执行"),   "**对 Device (设备端))** CPU 执行")
+check("colon before closing **", convert_markdown("**对 Device：** 说明"), "**对 Device:** 说明")
+check("comma before closing **", convert_markdown("**加粗，** 更多"), "**加粗,** 更多")
+check("colon before closing *", convert_markdown("*斜体：* 说明"), "*斜体:* 说明")
+check("opening ** unaffected", convert_markdown("这是 **重要** 内容"), "这是 **重要** 内容")
+check("english ( after ** unaffected", convert_markdown("这是 **(重要)** 内容"), "这是 **(重要)** 内容")
+check("fullwidth ( after ** fixed", convert_markdown("这是 **（重要）** 内容"), "这是 **(重要)** 内容")
+check("bold not broken by colon", convert_markdown("**对 Device (设备端)：** CPU 执行"), "**对 Device (设备端):** CPU 执行")
+check("bold not broken by closing bracket", convert_markdown("**对 Device (设备端)）** CPU 执行"), "**对 Device (设备端))** CPU 执行")
 
 # ---------------------------------------------------------------------------
 print("\n=== Markdown task-list checkboxes preserved ===")

@@ -72,12 +72,15 @@ python clang_format_dir.py src/ include/ -j 16   # 多目录, 16 线程
 python codex_auto_ping.py              # 常驻运行
 python codex_auto_ping.py --print-next # 只打印下一次触发时间
 python codex_auto_ping.py --once       # 只在已经到点时触发一次, 否则直接退出
+python codex_auto_ping.py --manual-at 2026-05-09-15-09 # 指定本地时间手动 ping 一次, 然后恢复周期模式
+python codex_auto_ping.py --manual-at 15:09 # 今天 15:09; 如果已过则顺延到明天 15:09
 ```
 
 常用参数:
 
 | 参数               | 说明                                   |
 | ------------------ | -------------------------------------- |
+| `--manual-at`      | 一次性手动触发时间, 格式 `YYYY-MM-DD-HH-MM` 或 `HH:MM` |
 | `--offset-minutes` | 在额度重置后多久发起 ping, 默认 1 分钟 |
 | `--prompt`         | 实际发送给 `codex exec` 的 prompt      |
 | `--workspace`      | 传给 `codex exec --cd` 的工作目录      |

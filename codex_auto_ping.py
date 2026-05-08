@@ -23,6 +23,8 @@ DEFAULT_PROMPT = "Reply with exactly: pong"
 DEFAULT_STATE_FILE = "codex_auto_ping_state.json"
 DEFAULT_LIMIT_ID = "codex"
 WINDOW_HOURS = 5
+MANUAL_TIME_FORMAT = "%Y-%m-%d-%H-%M"
+MANUAL_TIME_SHORT_FORMAT = "%H:%M"
 
 
 def now_local() -> datetime:
@@ -38,6 +40,34 @@ def parse_ts(value: str) -> datetime:
     if parsed.tzinfo is None:
         raise ValueError("timestamp must include timezone offset, for example +08:00")
     return parsed
+
+
+def parse_manual_local_ts(value: str) -> datetime:
+    local_tz = now_local().tzinfo
+    try:
+        parsed = datetime.strptime(value, MANUAL_TIME_FORMAT)
+        return parsed.replace(tzinfo=local_tz)
+    except ValueError:
+        pass
+
+    try:
+        parsed_short = datetime.strptime(value, MANUAL_TIME_SHORT_FORMAT)
+    except ValueError as exc:
+        raise ValueError(
+            "manual time must use 'YYYY-MM-DD-HH-MM' or 'HH:MM', "
+            "for example 2026-05-09-15-09 or 15:09"
+        ) from exc
+
+    now = now_local()
+    candidate = now.replace(
+        hour=parsed_short.hour,
+        minute=parsed_short.minute,
+        second=0,
+        microsecond=0,
+    )
+    if candidate <= now:
+        candidate += timedelta(days=1)
+    return candidate.replace(tzinfo=local_tz)
 
 
 def epoch_to_local(value: int) -> datetime:
@@ -347,6 +377,13 @@ def live_next_due(args: argparse.Namespace, state: State) -> datetime:
         raise
 
 
+def choose_next_due(args: argparse.Namespace, state: State, manual_pending: bool) -> tuple[datetime, str]:
+    if manual_pending:
+        assert args.manual_at is not None
+        return args.manual_at, "manual"
+    return live_next_due(args, state), "periodic"
+
+
 def run_ping(args: argparse.Namespace, state: State) -> bool:
     started_at = now_local()
     state.last_attempt_at = started_at
@@ -467,6 +504,14 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Print the next due time and exit without sending a request.",
     )
+    parser.add_argument(
+        "--manual-at",
+        type=parse_manual_local_ts,
+        help=(
+            "Schedule one manual ping at local time YYYY-MM-DD-HH-MM or HH:MM, then resume normal "
+            "periodic pinging afterward. Examples: 2026-05-09-15-09 or 15:09"
+        ),
+    )
     return parser
 
 
@@ -486,17 +531,22 @@ def main() -> int:
     print(f"last attempt at {describe_ts(state.last_attempt_at)}", flush=True)
     if state.last_exit_code is not None:
         print(f"last exit code: {state.last_exit_code}", flush=True)
+    if args.manual_at is not None:
+        print(f"manual one-shot due at {format_ts(args.manual_at)}", flush=True)
 
     if args.print_next:
-        due = live_next_due(args, state)
-        state.save(args.state_file)
+        manual_pending = args.manual_at is not None and now_local() < args.manual_at
+        due, mode = choose_next_due(args, state, manual_pending)
+        if mode == "periodic":
+            state.save(args.state_file)
         print(format_ts(due))
         return 0
 
+    manual_pending = args.manual_at is not None and now_local() < args.manual_at
     while True:
-        due = live_next_due(args, state)
+        due, mode = choose_next_due(args, state, manual_pending)
         state.save(args.state_file)
-        print(f"next due at {format_ts(due)}", flush=True)
+        print(f"next {mode} due at {format_ts(due)}", flush=True)
 
         if args.once and now_local() < due:
             return 0
@@ -504,6 +554,8 @@ def main() -> int:
         sleep_until(due, max(args.poll_seconds, 1))
         success = run_ping(args, state)
         state.save(args.state_file)
+        if mode == "manual":
+            manual_pending = False
 
         if args.once:
             return 0 if success else 1

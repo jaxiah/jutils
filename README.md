@@ -5,6 +5,7 @@
 - [pomo_debrief.py](#pomo_debriefpy)
 - [md_punct_cn2en.py](#md_punct_cn2enpy)
 - [clang_format_dir.py](#clang_format_dirpy)
+- [codex_auto_ping.py](#codex_auto_pingpy)
 
 ## pomo_debrief.py
 
@@ -60,3 +61,26 @@ python clang_format_dir.py src/ include/ -j 16   # 多目录, 16 线程
 ```
 
 依赖: `clang-format` (需在 PATH 中), `tqdm` (`pip install tqdm`).
+
+## codex_auto_ping.py
+
+读取本机 Codex CLI 的真实 5 小时额度重置时间, 并在 `reset + 1 分钟` 时自动发起一次低成本 `codex exec` 请求, 让下一段 5 小时窗口尽快开始. 适合常驻运行, 也可以配合计划任务周期性唤起.
+
+脚本不会写死账号信息, 它读取的是当前机器上已登录的 Codex CLI 账户状态. 默认 prompt 是 `Reply with exactly: pong`.
+
+```bash
+python codex_auto_ping.py              # 常驻运行
+python codex_auto_ping.py --print-next # 只打印下一次触发时间
+python codex_auto_ping.py --once       # 只在已经到点时触发一次, 否则直接退出
+```
+
+常用参数:
+
+| 参数 | 说明 |
+| --- | --- |
+| `--offset-minutes` | 在额度重置后多久发起 ping, 默认 1 分钟 |
+| `--prompt` | 实际发送给 `codex exec` 的 prompt |
+| `--workspace` | 传给 `codex exec --cd` 的工作目录 |
+| `--state-file` | 本地状态文件路径 |
+
+依赖: Python 3.8+, 已安装并已登录的 `codex` CLI. 当前主要在 Windows 环境验证.

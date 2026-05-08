@@ -1,5 +1,6 @@
 # Per-script config (personal paths, never commit)
 *.config.json
+codex_auto_ping_state.json
 
 # Python
 __pycache__/

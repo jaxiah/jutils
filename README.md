@@ -32,10 +32,10 @@ pythonw pomo_debrief.py   # 后台运行（无命令行窗口）
 
 **Config 字段**:
 
-| 字段 | 说明 |
-| --- | --- |
+| 字段             | 说明                                |
+| ---------------- | ----------------------------------- |
 | `data_json_path` | TaskNotes 插件的 data.json 完整路径 |
-| `poll_interval` | 轮询间隔秒数 (默认 3) |
+| `poll_interval`  | 轮询间隔秒数 (默认 3)               |
 
 依赖: Python 3.8+, 标准库 (`tkinter`, `json`), 无需额外安装.
 
@@ -76,11 +76,11 @@ python codex_auto_ping.py --once       # 只在已经到点时触发一次, 否�
 
 常用参数:
 
-| 参数 | 说明 |
-| --- | --- |
+| 参数               | 说明                                   |
+| ------------------ | -------------------------------------- |
 | `--offset-minutes` | 在额度重置后多久发起 ping, 默认 1 分钟 |
-| `--prompt` | 实际发送给 `codex exec` 的 prompt |
-| `--workspace` | 传给 `codex exec --cd` 的工作目录 |
-| `--state-file` | 本地状态文件路径 |
+| `--prompt`         | 实际发送给 `codex exec` 的 prompt      |
+| `--workspace`      | 传给 `codex exec --cd` 的工作目录      |
+| `--state-file`     | 本地状态文件路径                       |
 
 依赖: Python 3.8+, 已安装并已登录的 `codex` CLI. 当前主要在 Windows 环境验证.

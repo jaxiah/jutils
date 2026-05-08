@@ -44,6 +44,10 @@ def epoch_to_local(value: int) -> datetime:
     return datetime.fromtimestamp(value, tz=now_local().tzinfo)
 
 
+def describe_ts(value: datetime | None) -> str:
+    return format_ts(value) if value is not None else "<none>"
+
+
 def resolve_codex_bin(user_value: str) -> str:
     if Path(user_value).exists():
         return str(Path(user_value))
@@ -122,9 +126,7 @@ class WebSocketClient:
         sock.sendall(request)
         response = self._read_http_response(sock)
 
-        accept_expected = base64.b64encode(
-            hashlib.sha1((key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode("ascii")).digest()
-        ).decode("ascii")
+        accept_expected = base64.b64encode(hashlib.sha1((key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode("ascii")).digest()).decode("ascii")
         if "101" not in response.splitlines()[0]:
             raise RuntimeError(f"WebSocket handshake failed: {response.splitlines()[0]}")
         if f"Sec-WebSocket-Accept: {accept_expected}".lower() not in response.lower():
@@ -329,14 +331,18 @@ def inferred_next_due(anchor: datetime, offset_minutes: int) -> datetime:
 
 def live_next_due(args: argparse.Namespace, state: State) -> datetime:
     try:
+        print(f"[{format_ts(now_local())}] querying live reset time from Codex", flush=True)
         reset_at = query_reset_at(args)
         state.last_known_reset_at = reset_at
+        print(f"last reset at {format_ts(reset_at)}", flush=True)
         return reset_at + timedelta(minutes=args.offset_minutes)
     except Exception as exc:  # noqa: BLE001
         print(f"warning: failed to read live reset time: {exc}", flush=True)
         if state.last_known_reset_at is not None:
+            print(f"falling back to last known reset at {format_ts(state.last_known_reset_at)}", flush=True)
             return state.last_known_reset_at + timedelta(minutes=args.offset_minutes)
         if state.last_success_at is not None:
+            print(f"falling back to inferred schedule from last success at {format_ts(state.last_success_at)}", flush=True)
             return inferred_next_due(state.last_success_at, args.offset_minutes)
         raise
 
@@ -471,6 +477,15 @@ def main() -> int:
     args.state_file.parent.mkdir(parents=True, exist_ok=True)
 
     state = State.load(args.state_file)
+    print("codex_auto_ping.py started", flush=True)
+    print(f"now: {format_ts(now_local())}", flush=True)
+    print(f"workspace: {args.workspace}", flush=True)
+    print(f"state file: {args.state_file}", flush=True)
+    print(f"last success at {describe_ts(state.last_success_at)}", flush=True)
+    print(f"last known reset at {describe_ts(state.last_known_reset_at)}", flush=True)
+    print(f"last attempt at {describe_ts(state.last_attempt_at)}", flush=True)
+    if state.last_exit_code is not None:
+        print(f"last exit code: {state.last_exit_code}", flush=True)
 
     if args.print_next:
         due = live_next_due(args, state)

@@ -424,6 +424,18 @@ def choose_next_due(args: argparse.Namespace, state: State, manual_pending: bool
     return live_next_due(args, state), "periodic"
 
 
+def describe_run_mode(args: argparse.Namespace) -> str:
+    if args.daily_start is not None:
+        return (
+            "mode: daily-start "
+            f"({args.daily_start.strftime(MANUAL_TIME_SHORT_FORMAT)} local start, "
+            "back-to-back during the day, paused between 00:00 and daily start)"
+        )
+    if args.manual_at is not None:
+        return f"mode: periodic with one manual trigger at {format_ts(args.manual_at)}"
+    return "mode: periodic back-to-back"
+
+
 def run_ping(args: argparse.Namespace, state: State) -> bool:
     started_at = now_local()
     state.last_attempt_at = started_at
@@ -574,6 +586,7 @@ def main() -> int:
     print(f"now: {format_ts(now_local())}", flush=True)
     print(f"workspace: {args.workspace}", flush=True)
     print(f"state file: {args.state_file}", flush=True)
+    print(describe_run_mode(args), flush=True)
     print(f"last success at {describe_ts(state.last_success_at)}", flush=True)
     print(f"last known reset at {describe_ts(state.last_known_reset_at)}", flush=True)
     print(f"last attempt at {describe_ts(state.last_attempt_at)}", flush=True)

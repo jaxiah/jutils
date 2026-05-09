@@ -63,9 +63,9 @@ if (-not (Test-Path $codexScript)) {
 if ($wt) {
     New-WtTab -Title "pomo_debrief" -ScriptPath $pomoScript
     Start-Sleep -Milliseconds 800
-    New-WtTab -Title "codex_auto_ping" -ScriptPath $codexScript -ExtraArgs @("-u")
+    New-WtTab -Title "codex_auto_ping" -ScriptPath $codexScript -ExtraArgs @("-u", "--daily-start", "05:00")
     exit 0
 }
 
 Start-UtilityPwshWindow -Title "pomo_debrief" -ScriptPath $pomoScript
-Start-UtilityPwshWindow -Title "codex_auto_ping" -ScriptPath $codexScript -ExtraArgs @("-u")
+Start-UtilityPwshWindow -Title "codex_auto_ping" -ScriptPath $codexScript -ExtraArgs @("-u", "--daily-start", "05:00")

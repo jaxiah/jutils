@@ -12,12 +12,14 @@ function Start-UtilityPwshWindow {
     param(
         [string]$Title,
         [string]$ScriptPath,
-        [string[]]$ExtraArgs = @()
+        [string[]]$PythonArgs = @(),
+        [string[]]$ScriptArgs = @()
     )
 
     $quotedScript = "'" + $ScriptPath.Replace("'", "''") + "'"
-    $argText = if ($ExtraArgs.Count -gt 0) { ($ExtraArgs -join " ") + " " } else { "" }
-    $command = "python ${argText}${quotedScript}"
+    $pythonArgText = if ($PythonArgs.Count -gt 0) { ($PythonArgs -join " ") + " " } else { "" }
+    $scriptArgText = if ($ScriptArgs.Count -gt 0) { " " + ($ScriptArgs -join " ") } else { "" }
+    $command = "python ${pythonArgText}${quotedScript}${scriptArgText}"
     Start-Process -FilePath $pwsh.Source -WorkingDirectory $root -ArgumentList @("-NoExit", "-Command", $command) | Out-Null
 }
 
@@ -25,12 +27,14 @@ function New-WtTab {
     param(
         [string]$Title,
         [string]$ScriptPath,
-        [string[]]$ExtraArgs = @()
+        [string[]]$PythonArgs = @(),
+        [string[]]$ScriptArgs = @()
     )
 
     $quotedScript = "'" + $ScriptPath.Replace("'", "''") + "'"
-    $argText = if ($ExtraArgs.Count -gt 0) { ($ExtraArgs -join " ") + " " } else { "" }
-    $command = "python ${argText}${quotedScript}"
+    $pythonArgText = if ($PythonArgs.Count -gt 0) { ($PythonArgs -join " ") + " " } else { "" }
+    $scriptArgText = if ($ScriptArgs.Count -gt 0) { " " + ($ScriptArgs -join " ") } else { "" }
+    $command = "python ${pythonArgText}${quotedScript}${scriptArgText}"
 
     $wtArgs = @(
         "-w",
@@ -63,9 +67,9 @@ if (-not (Test-Path $codexScript)) {
 if ($wt) {
     New-WtTab -Title "pomo_debrief" -ScriptPath $pomoScript
     Start-Sleep -Milliseconds 800
-    New-WtTab -Title "codex_auto_ping" -ScriptPath $codexScript -ExtraArgs @("-u", "--daily-start", "05:00")
+    New-WtTab -Title "codex_auto_ping" -ScriptPath $codexScript -PythonArgs @("-u") -ScriptArgs @("--daily-start", "05:00")
     exit 0
 }
 
 Start-UtilityPwshWindow -Title "pomo_debrief" -ScriptPath $pomoScript
-Start-UtilityPwshWindow -Title "codex_auto_ping" -ScriptPath $codexScript -ExtraArgs @("-u", "--daily-start", "05:00")
+Start-UtilityPwshWindow -Title "codex_auto_ping" -ScriptPath $codexScript -PythonArgs @("-u") -ScriptArgs @("--daily-start", "05:00")

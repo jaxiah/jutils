@@ -25,6 +25,7 @@ DEFAULT_LIMIT_ID = "codex"
 WINDOW_HOURS = 5
 MANUAL_TIME_FORMAT = "%Y-%m-%d-%H-%M"
 MANUAL_TIME_SHORT_FORMAT = "%H:%M"
+PROXY_ENV_KEYS = ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy")
 
 
 def now_local() -> datetime:
@@ -436,6 +437,17 @@ def describe_run_mode(args: argparse.Namespace) -> str:
     return "mode: periodic back-to-back"
 
 
+def print_proxy_env() -> None:
+    found_any = False
+    for key in PROXY_ENV_KEYS:
+        value = os.environ.get(key)
+        if value:
+            print(f"{key}={value}", flush=True)
+            found_any = True
+    if not found_any:
+        print("proxy env: <none>", flush=True)
+
+
 def run_ping(args: argparse.Namespace, state: State) -> bool:
     started_at = now_local()
     state.last_attempt_at = started_at
@@ -587,6 +599,7 @@ def main() -> int:
     print(f"workspace: {args.workspace}", flush=True)
     print(f"state file: {args.state_file}", flush=True)
     print(describe_run_mode(args), flush=True)
+    print_proxy_env()
     print(f"last success at {describe_ts(state.last_success_at)}", flush=True)
     print(f"last known reset at {describe_ts(state.last_known_reset_at)}", flush=True)
     print(f"last attempt at {describe_ts(state.last_attempt_at)}", flush=True)

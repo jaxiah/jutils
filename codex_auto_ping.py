@@ -14,7 +14,7 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, time as dt_time, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -76,6 +76,28 @@ def epoch_to_local(value: int) -> datetime:
 
 def describe_ts(value: datetime | None) -> str:
     return format_ts(value) if value is not None else "<none>"
+
+
+def parse_time_of_day(value: str) -> dt_time:
+    try:
+        return datetime.strptime(value, MANUAL_TIME_SHORT_FORMAT).time()
+    except ValueError as exc:
+        raise ValueError(f"time must use {MANUAL_TIME_SHORT_FORMAT!r}, for example 10:00") from exc
+
+
+def combine_local(day: date, time_value: dt_time) -> datetime:
+    return datetime.combine(day, time_value, tzinfo=now_local().tzinfo)
+
+
+def next_daily_start(now: datetime, start_time: dt_time) -> datetime:
+    today_start = combine_local(now.date(), start_time)
+    if now < today_start:
+        return today_start
+    return combine_local(now.date() + timedelta(days=1), start_time)
+
+
+def in_daily_quiet_hours(now: datetime, start_time: dt_time) -> bool:
+    return now.time() < start_time
 
 
 def resolve_codex_bin(user_value: str) -> str:
@@ -378,9 +400,27 @@ def live_next_due(args: argparse.Namespace, state: State) -> datetime:
 
 
 def choose_next_due(args: argparse.Namespace, state: State, manual_pending: bool) -> tuple[datetime, str]:
+    now = now_local()
     if manual_pending:
         assert args.manual_at is not None
         return args.manual_at, "manual"
+    if args.daily_start is not None:
+        if in_daily_quiet_hours(now, args.daily_start):
+            return next_daily_start(now, args.daily_start), "daily-start"
+
+        try:
+            periodic_due = live_next_due(args, state)
+        except Exception:
+            print("no active reset time available after daily start; attempting activation now", flush=True)
+            return now, "daily-start"
+
+        if periodic_due.date() != now.date():
+            return next_daily_start(now, args.daily_start), "daily-start"
+        tomorrow_start = combine_local(now.date() + timedelta(days=1), args.daily_start)
+        if periodic_due >= tomorrow_start:
+            return tomorrow_start, "daily-start"
+        return periodic_due, "periodic"
+
     return live_next_due(args, state), "periodic"
 
 
@@ -512,6 +552,14 @@ def build_parser() -> argparse.ArgumentParser:
             "periodic pinging afterward. Examples: 2026-05-09-15-09 or 15:09"
         ),
     )
+    parser.add_argument(
+        "--daily-start",
+        type=parse_time_of_day,
+        help=(
+            "Activate one workday cycle at local time HH:MM, then keep back-to-back pinging for the rest "
+            "of the day. Between 00:00 and the next daily start, periodic pinging is paused."
+        ),
+    )
     return parser
 
 
@@ -533,6 +581,8 @@ def main() -> int:
         print(f"last exit code: {state.last_exit_code}", flush=True)
     if args.manual_at is not None:
         print(f"manual one-shot due at {format_ts(args.manual_at)}", flush=True)
+    if args.daily_start is not None:
+        print(f"daily start at {args.daily_start.strftime(MANUAL_TIME_SHORT_FORMAT)}", flush=True)
 
     if args.print_next:
         manual_pending = args.manual_at is not None and now_local() < args.manual_at

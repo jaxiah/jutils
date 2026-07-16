@@ -6,6 +6,7 @@
 - [md_punct_cn2en.py](#md_punct_cn2enpy)
 - [clang_format_dir.py](#clang_format_dirpy)
 - [codex_auto_ping.py](#codex_auto_pingpy)
+- [codegraph_autosync.py](#codegraph_autosyncpy)
 
 ## pomo_debrief.py
 
@@ -89,3 +90,16 @@ python codex_auto_ping.py --daily-start 10:00 # 每天 10:00 激活, 当天剩�
 | `--state-file`     | 本地状态文件路径                       |
 
 依赖: Python 3.8+, 已安装并已登录的 `codex` CLI. 当前主要在 Windows 环境验证.
+
+## codegraph_autosync.py
+
+在 Windows 上使用原生 `ReadDirectoryChangesW` 监听仓库变动，并在保存完成后自动执行一次 `codegraph sync`. 不依赖 `watchdog`; 只有 Windows 通知缓冲区溢出时才会做一次快照校正。`.codegraph`、`.git`、虚拟环境和依赖目录默认忽略，避免同步索引自身造成循环触发.
+
+```bash
+cd D:\\work\\my-repo
+python D:\\jutils\\codegraph_autosync.py
+python D:\\jutils\\codegraph_autosync.py --sync-on-start
+python D:\\jutils\\codegraph_autosync.py --debounce 2 --retry-delay 15
+```
+
+依赖: Python 3.8+, 标准库；需要 `codegraph` 命令已在 PATH 中，或通过 `--codegraph-bin` 指定路径。非 Windows 环境会自动回退到轮询模式.

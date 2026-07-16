@@ -93,13 +93,13 @@ python codex_auto_ping.py --daily-start 10:00 # 每天 10:00 激活, 当天剩�
 
 ## codegraph_autosync.py
 
-在 Windows 上使用原生 `ReadDirectoryChangesW` 监听仓库变动，并在保存完成后自动执行一次 `codegraph sync`. 不依赖 `watchdog`; 只有 Windows 通知缓冲区溢出时才会做一次快照校正。`.codegraph`、`.git`、虚拟环境和依赖目录默认忽略，避免同步索引自身造成循环触发.
+在 Windows 上使用原生 `ReadDirectoryChangesW` 监听仓库变动，并在保存完成后自动执行一次 `codegraph sync`. 不依赖 `watchdog`; Windows 通知缓冲区溢出时会安排一次保守同步。`.codegraph`、`.git`、虚拟环境和依赖目录默认忽略，避免同步索引自身造成循环触发。目标目录尚未初始化时会自动执行 `codegraph init`.
 
 ```bash
 cd D:\\work\\my-repo
 python D:\\jutils\\codegraph_autosync.py
 python D:\\jutils\\codegraph_autosync.py --sync-on-start
-python D:\\jutils\\codegraph_autosync.py --debounce 2 --retry-delay 15
+python D:\\jutils\\codegraph_autosync.py --debounce 2 --retry-delay 15 --sync-timeout 120
 ```
 
 依赖: Python 3.8+, 标准库；需要 `codegraph` 命令已在 PATH 中，或通过 `--codegraph-bin` 指定路径。非 Windows 环境会自动回退到轮询模式.

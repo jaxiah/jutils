@@ -20,16 +20,18 @@ from __future__ import annotations
 import argparse
 import ctypes
 import fnmatch
+from functools import partial
 import logging
 import os
 import queue
 import shutil
 import signal
+import stat as stat_module
 import subprocess
 import sys
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Callable, Iterable, Mapping, Sequence
 
@@ -51,6 +53,7 @@ DEFAULT_IGNORE_DIRS = frozenset(
 DEFAULT_IGNORE_PATTERNS = ("*.pyc", "*.pyo", "*.swp", "*.swo", "~$*")
 FileSignature = tuple[int, int, int]
 Snapshot = dict[str, FileSignature]
+EVENT_QUEUE_TIMEOUT = 0.25
 
 
 def _kernel32():
@@ -90,7 +93,6 @@ class WindowsChangeSource:
     _FILE_FLAG_BACKUP_SEMANTICS = 0x02000000
     _FILE_NOTIFY_CHANGE = 0x00000001 | 0x00000002 | 0x00000004 | 0x00000008 | 0x00000010 | 0x00000040
     _ERROR_NOTIFY_ENUM_DIR = 1022
-    _ERROR_INVALID_PARAMETER = 87
 
     def __init__(self, root: Path, ignore_dirs: Iterable[str], ignore_patterns: Iterable[str]) -> None:
         if os.name != "nt":
@@ -139,7 +141,7 @@ class WindowsChangeSource:
                 error = ctypes.get_last_error()
                 if self._stop.is_set():
                     return
-                if error in (self._ERROR_NOTIFY_ENUM_DIR, self._ERROR_INVALID_PARAMETER):
+                if error == self._ERROR_NOTIFY_ENUM_DIR:
                     self._events.put(("overflow", set()))
                     continue
                 self._events.put(("error", {str(error)}))
@@ -208,6 +210,47 @@ class WatchConfig:
     ignore_patterns: tuple[str, ...] = DEFAULT_IGNORE_PATTERNS
     sync_on_start: bool = False
     once: bool = False
+    verbose: bool = False
+
+
+@dataclass
+class DebouncedSyncState:
+    """Track one pending change batch across debounce and retry windows."""
+
+    pending_paths: set[str] = field(default_factory=set)
+    last_change_at: float | None = None
+    retry_at: float = 0.0
+
+    @property
+    def pending(self) -> bool:
+        return bool(self.pending_paths)
+
+    def add_changes(self, paths: Iterable[str], now: float) -> bool:
+        """Add paths and restart debounce without shortening a retry delay."""
+
+        paths = set(paths)
+        if not paths:
+            return False
+        new_batch = not self.pending
+        self.pending_paths.update(paths)
+        self.last_change_at = now
+        return new_batch
+
+    def ready(self, now: float, debounce: float) -> bool:
+        return (
+            self.pending
+            and self.last_change_at is not None
+            and now >= self.last_change_at + debounce
+            and now >= self.retry_at
+        )
+
+    def mark_success(self) -> None:
+        self.pending_paths.clear()
+        self.last_change_at = None
+        self.retry_at = 0.0
+
+    def mark_failure(self, now: float, retry_delay: float) -> None:
+        self.retry_at = now + retry_delay
 
 
 def _matches_ignore(relative_path: Path, ignore_dirs: Iterable[str], ignore_patterns: Iterable[str]) -> bool:
@@ -261,16 +304,16 @@ def build_snapshot(
             if _matches_ignore(relative_path, ignored_dirs, ignored_patterns):
                 continue
             try:
-                stat = path.stat()
+                file_stat = path.stat()
             except (FileNotFoundError, PermissionError, OSError):
                 # A file can disappear between os.walk and stat during a save.
                 continue
-            if not path.is_file():
+            if not stat_module.S_ISREG(file_stat.st_mode):
                 continue
             snapshot[relative_path.as_posix()] = (
-                stat.st_mtime_ns,
-                stat.st_ctime_ns,
-                stat.st_size,
+                file_stat.st_mtime_ns,
+                file_stat.st_ctime_ns,
+                file_stat.st_size,
             )
 
     return snapshot
@@ -370,6 +413,19 @@ class AutoSyncWatcher:
             ignore_patterns=self.config.ignore_patterns,
         )
 
+    def _sync_if_ready(self, state: DebouncedSyncState, now: float) -> bool:
+        """Run one sync when debounce and retry windows have elapsed."""
+
+        if not state.ready(now, self.config.debounce):
+            return False
+        LOGGER.info("Updating CodeGraph index.")
+        if self.sync_fn(self.config.root, self.config.codegraph_bin, self.config.sync_args):
+            LOGGER.info("CodeGraph index updated.")
+            state.mark_success()
+            return True
+        state.mark_failure(now, self.config.retry_delay)
+        return False
+
     def watch(self) -> int:
         if os.name == "nt":
             try:
@@ -379,56 +435,34 @@ class AutoSyncWatcher:
         return self._watch_polling()
 
     def _watch_windows(self) -> int:
-        # One baseline is only needed to recover from the rare Windows notification
-        # buffer overflow. Normal changes arrive as paths from the OS and do not scan.
-        self._last_snapshot = self._snapshot()
         source = WindowsChangeSource(
             self.config.root,
             self.config.ignore_dirs,
             self.config.ignore_patterns,
         )
         source.start()
-        pending_since: float | None = time.monotonic() if self.config.sync_on_start else None
-        retry_at = 0.0
-        pending_paths: set[str] = {"<startup>"} if self.config.sync_on_start else set()
+        state = DebouncedSyncState()
+        if self.config.sync_on_start:
+            state.add_changes({"<startup>"}, time.monotonic())
 
         LOGGER.info("Watching directory: %s", self.config.root)
         LOGGER.info("Using Windows ReadDirectoryChangesW (event-driven); debounce %.1fs; press Ctrl+C to stop.", self.config.debounce)
         try:
             while not self._stop:
-                event = source.get(timeout=min(0.5, max(self.config.poll_interval, 0.05)))
+                event = source.get(timeout=EVENT_QUEUE_TIMEOUT)
                 if event is not None:
                     kind, paths = event
                     if kind == "error":
                         raise OSError(f"ReadDirectoryChangesW failed, error code: {', '.join(sorted(paths))}")
                     if kind == "overflow":
-                        LOGGER.warning("Windows notification buffer overflow; running one snapshot reconciliation.")
-                        current = self._snapshot()
-                        paths = changed_paths(self._last_snapshot, current) if hasattr(self, "_last_snapshot") else set()
-                        self._last_snapshot = current
-                    if paths:
-                        was_pending = pending_since is not None
-                        pending_paths.update(paths)
-                        pending_since = pending_since or time.monotonic()
-                        retry_at = 0.0
-                        if not was_pending:
-                            LOGGER.info("Changes detected; CodeGraph index update scheduled.")
+                        LOGGER.warning("Windows notification buffer overflow; scheduling a conservative index update.")
+                        paths = {"<notification-overflow>"}
+                    if state.add_changes(paths, time.monotonic()):
+                        LOGGER.info("Changes detected; CodeGraph index update scheduled.")
 
-                if pending_since is None:
-                    continue
                 now = time.monotonic()
-                if now - pending_since < self.config.debounce or now < retry_at:
-                    continue
-                LOGGER.info("Updating CodeGraph index.")
-                if self.sync_fn(self.config.root, self.config.codegraph_bin, self.config.sync_args):
-                    LOGGER.info("CodeGraph index updated.")
-                    pending_since = None
-                    pending_paths.clear()
-                    retry_at = 0.0
-                    if self.config.once:
-                        return 0
-                else:
-                    retry_at = time.monotonic() + self.config.retry_delay
+                if self._sync_if_ready(state, now) and self.config.once:
+                    return 0
         finally:
             source.stop()
         LOGGER.info("Stopped watching.")
@@ -436,9 +470,9 @@ class AutoSyncWatcher:
 
     def _watch_polling(self) -> int:
         previous = self._snapshot()
-        pending_since: float | None = time.monotonic() if self.config.sync_on_start else None
-        retry_at = 0.0
-        pending_paths: set[str] = {"<startup>"} if self.config.sync_on_start else set()
+        state = DebouncedSyncState()
+        if self.config.sync_on_start:
+            state.add_changes({"<startup>"}, time.monotonic())
 
         LOGGER.info("Watching directory: %s", self.config.root)
         LOGGER.info("Using polling fallback (every %.1fs); debounce %.1fs; press Ctrl+C to stop.", self.config.poll_interval, self.config.debounce)
@@ -450,31 +484,14 @@ class AutoSyncWatcher:
             current = self._snapshot()
             changes = changed_paths(previous, current)
             previous = current
-            if changes:
-                was_pending = pending_since is not None
-                pending_paths.update(changes)
-                pending_since = pending_since or time.monotonic()
-                retry_at = 0.0
-                if not was_pending:
-                    LOGGER.info("Changes detected; CodeGraph index update scheduled.")
+            if state.add_changes(changes, time.monotonic()):
+                LOGGER.info("Changes detected; CodeGraph index update scheduled.")
 
-            if pending_since is None:
-                continue
             now = time.monotonic()
-            if now - pending_since < self.config.debounce or now < retry_at:
-                continue
-
-            LOGGER.info("Updating CodeGraph index.")
-            if self.sync_fn(self.config.root, self.config.codegraph_bin, self.config.sync_args):
-                LOGGER.info("CodeGraph index updated.")
+            if self._sync_if_ready(state, now):
                 previous = self._snapshot()
-                pending_since = None
-                pending_paths.clear()
-                retry_at = 0.0
                 if self.config.once:
                     return 0
-            else:
-                retry_at = time.monotonic() + self.config.retry_delay
 
         LOGGER.info("Stopped watching.")
         return 0
@@ -519,6 +536,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> WatchConfig:
         ignore_patterns=ignore_patterns,
         sync_on_start=args.sync_on_start,
         once=args.once,
+        verbose=args.verbose,
     )
 
 
@@ -531,12 +549,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 pass
     config = _parse_args(argv)
     logging.basicConfig(
-        level=logging.DEBUG if "--verbose" in (argv or sys.argv[1:]) else logging.INFO,
+        level=logging.DEBUG if config.verbose else logging.INFO,
         format="%(asctime)s %(levelname)s %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
     try:
-        config = WatchConfig(**{**config.__dict__, "codegraph_bin": resolve_codegraph_bin(config.codegraph_bin)})
+        config = replace(config, codegraph_bin=resolve_codegraph_bin(config.codegraph_bin))
     except FileNotFoundError as exc:
         LOGGER.error("%s", exc)
         return 2
@@ -547,12 +565,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     ):
         return 1
 
-    sync_runner = lambda root, codegraph_bin, sync_args: run_sync(
-        root,
-        codegraph_bin,
-        sync_args,
-        timeout=config.sync_timeout,
-    )
+    sync_runner = partial(run_sync, timeout=config.sync_timeout)
     watcher = AutoSyncWatcher(config, sync_fn=sync_runner)
     signal.signal(signal.SIGINT, watcher.stop)
     if hasattr(signal, "SIGTERM"):
